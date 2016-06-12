@@ -54,8 +54,27 @@ public class WikiCrawler {
 	 * @throws IOException
 	 */
 	public String crawl(boolean testing) throws IOException {
-        // FILL THIS IN!
-		return null;
+		Elements pageContents;
+        // Remove a URL from the queue in FIFO order
+        String firstURL = queue.remove();
+        if (testing)
+        	// Populate the page elements with cached content
+        	pageContents = wf.readWikipedia(firstURL);
+        else
+        {
+        	// Don't re-index the URL and return null if it's already in there
+        	if (index.isIndexed(firstURL))
+        		return null;
+        	// Otherwise populate the page elements by fetching web pages
+        	else pageContents = wf.fetchWikipedia(firstURL);
+        }
+        // Index the page (no check needed here since the not testing case already
+        // handled already-indexed pages), then find all its internal links and add 
+        // them to the queue
+        index.indexPage(firstURL, pageContents);
+        queueInternalLinks(pageContents);
+		// Return URL of indexed page
+		return firstURL;
 	}
 	
 	/**
@@ -65,7 +84,24 @@ public class WikiCrawler {
 	 */
 	// NOTE: absence of access level modifier means package-level
 	void queueInternalLinks(Elements paragraphs) {
-        // FILL THIS IN!
+        String currentURL;
+        Elements links;
+        for (Element paragraph : paragraphs)
+        {
+            // Fetch all link nodes in each paragraph
+            links = paragraph.select("a[href]");
+
+            // Examines each link and adds it to the queue if it's an internal
+            // link -- in this case, links back to Wikipedia
+
+            for (Element link : links)
+            {
+            	currentURL = link.attr("href");
+            	if (currentURL.startsWith("/wiki/"))
+            		// Need to build a full URL from relative resource link
+            		queue.add("https://en.wikipedia.org" + currentURL);
+			}
+		}
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -84,9 +120,6 @@ public class WikiCrawler {
 		String res;
 		do {
 			res = wc.crawl(false);
-
-            // REMOVE THIS BREAK STATEMENT WHEN crawl() IS WORKING
-            break;
 		} while (res == null);
 		
 		Map<String, Integer> map = index.getCounts("the");
